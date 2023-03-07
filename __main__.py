@@ -1,9 +1,11 @@
+from webserver import keep_alive
 import discord
 from discord.ext import commands
-from config import config 
+from config import config
 
 
-bot = commands.Bot(command_prefix=config.BOT_PREFIX, intents=discord.Intents.all())
+bot = commands.Bot(command_prefix=config.BOT_PREFIX,
+                   intents=discord.Intents.all())
 
 
 if __name__=="__main__":
@@ -24,6 +26,5 @@ async def on_ready():
     print(config.STARTUP_COMPLETE_MESSAGE)
 
 
-
-
+keep_alive()
 bot.run(config.BOT_TOKEN)

@@ -1,2 +1,2 @@
 # Babanov-bot
-Babanov's helper
+A discord bot to help the lector

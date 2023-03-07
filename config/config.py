@@ -1,4 +1,4 @@
-BOT_TOKEN: str = ''
+BOT_TOKEN: str = 'z'
 
 BOT_PREFIX = '$'
 BOT_NAME = ''

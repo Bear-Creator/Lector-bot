@@ -129,5 +129,5 @@ dmypy.json
 .pyre/
 
 #config file
-config.py
+config/
 webserver.py

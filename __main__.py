@@ -25,7 +25,7 @@ async def new_user(member: discord.Member):
 
     if (member.guild.id != config.GUILDE_ID): #Костыль - бот не может получить reg беседу для каждой гильдии
         return
-    await bot.get_channel(config.REGISTRATION_CHANNEL).send(f'<@{member.id}>, пройдите регистрацию. Отправьте {config.BOT_PREFIX}reg')
+    await bot.get_channel(config.REGISTRATION_CHANNEL).send(f'{member.mention}, пройдите регистрацию. Отправьте {config.BOT_PREFIX}reg')
 
 
 if __name__=="__main__":
@@ -73,17 +73,22 @@ async def reg(ctx: commands.Context):
     categorie = discord.utils.get(guild.categories, name='Регистрация')
     if categorie is None: 
         categorie = await guild.create_category('Регистрация')
-    
-    regchen = discord.utils.get(categorie.channels, name=f'Регистрация {member}')
+
+    regchen = discord.utils.get(categorie.channels, name=f'Регистрация-{member.name.lower()[:-5]}')
     if regchen is None:
-        channel = await guild.create_text_channel(f'регистрация {member}', 
+        regchen = await guild.create_text_channel(f'Регистрация-{member}', 
                                                 overwrites=overwrites, 
                                                 position=0,
                                                 topic='Зарегистрируйся, чтобы посещать лекции',
                                                 slowmode_delay=30,
                                                 category=categorie,
                                                 default_auto_archive_duration=1440)
-    
+        
+    await ctx.channel.send(f'{member.mention}, переходи в эту комнату: {regchen.mention}')
+    await regchen.send('Напишите, пожалуйста ваше полное имя в форме ФИО')
+
+
+
     
 
 keep_alive()

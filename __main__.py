@@ -12,6 +12,7 @@ bot = commands.Bot(command_prefix=config.BOT_PREFIX,
                    intents=discord.Intents.all())
 
 
+#Adding new users in DB and asking then to reg
 async def new_user(member: discord.Member):
 
     if (cursor.execute(
@@ -39,10 +40,10 @@ if __name__=="__main__":
 @bot.event
 async def on_ready():
     print(config.STARTUP_MESSAGE)
-    await bot.change_presence(status=discord.Status.online, activity=discord.Game(name=f"Введите {config.BOT_PREFIX}help"))
+    await bot.change_presence(status=discord.Status.online, activity=discord.Game(name=f"debuging")) #Введите {config.BOT_PREFIX}help
 
     for guild in bot.guilds:
-        print(f"Joined {guild.name}", guild.id)
+        print(f"Joined {guild.name}")  
 
         cursor.execute(
             f'''CREATE TABLE if NOT EXISTS users_{guild.id} (
@@ -58,6 +59,32 @@ async def on_ready():
     
     print(config.STARTUP_COMPLETE_MESSAGE)
 
+@bot.command() 
+async def reg(ctx: commands.Context):
+    await ctx.message.delete()
+
+    guild = ctx.message.guild
+    member = ctx.author
+    overwrites = {                                                             #Права для чата регистрации
+        guild.default_role: discord.PermissionOverwrite(read_messages=False),
+        member: discord.PermissionOverwrite(read_messages=True),
+    }
+
+    categorie = discord.utils.get(guild.categories, name='Регистрация')
+    if categorie is None: 
+        categorie = await guild.create_category('Регистрация')
+    
+    regchen = discord.utils.get(categorie.channels, name=f'Регистрация {member}')
+    if regchen is None:
+        channel = await guild.create_text_channel(f'регистрация {member}', 
+                                                overwrites=overwrites, 
+                                                position=0,
+                                                topic='Зарегистрируйся, чтобы посещать лекции',
+                                                slowmode_delay=30,
+                                                category=categorie,
+                                                default_auto_archive_duration=1440)
+    
+    
 
 keep_alive()
 bot.run(config.BOT_TOKEN)

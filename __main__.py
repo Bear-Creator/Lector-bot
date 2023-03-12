@@ -23,10 +23,6 @@ async def new_user(member: discord.Member):
     cursor.execute(f'INSERT INTO users_{member.guild.id} (id)VALUES ({member.id});')
     db.commit()
 
-    if (member.guild.id != config.GUILDE_ID): #Костыль - бот не может получить reg беседу для каждой гильдии
-        return
-    await bot.get_channel(config.REGISTRATION_CHANNEL).send(f'{member.mention}, пройдите регистрацию. Отправьте {config.BOT_PREFIX}reg')
-
 
 if __name__=="__main__":
 
@@ -67,35 +63,35 @@ async def on_ready():
     print(config.STARTUP_COMPLETE_MESSAGE)
 
 
-@bot.command() 
-async def reg(ctx: commands.Context):
-    await ctx.message.delete()
-
-    guild = ctx.message.guild
-    member = ctx.author
+@bot.event
+async def on_raw_reaction_add(reaction: discord.raw_models.RawReactionActionEvent):
+    guild = bot.get_guild(reaction.guild_id)
+    member = reaction.member
     overwrites = {                                                             #Права для чата регистрации
         guild.default_role: discord.PermissionOverwrite(read_messages=False),
         member: discord.PermissionOverwrite(read_messages=True),
     }
 
-    categorie = discord.utils.get(guild.categories, name='Регистрация')
-    if categorie is None: 
-        categorie = await guild.create_category('Регистрация')
+    ChID = discord.utils.get(guild.channels, name='вход').id
+    if reaction.channel_id == ChID and reaction.emoji.name == '✅':
+        
+        categorie = discord.utils.get(guild.categories, name='Регистрация')
+        if categorie is None: 
+            categorie = await guild.create_category('Регистрация')
 
-    regchen = discord.utils.get(categorie.channels, name=f'регистрация-{member.name.lower()+str(member)[-4:]}')
-    if regchen is not None:
-        await regchen.delete()
-    
-    regchen = await guild.create_text_channel(f'Регистрация-{member}', 
-                                            overwrites=overwrites, 
-                                            position=0,
-                                            topic='Зарегистрируйся, чтобы посещать лекции',
-                                            slowmode_delay=30,
-                                            category=categorie,
-                                            default_auto_archive_duration=1440)
+        regchen = discord.utils.get(categorie.channels, name=f'регистрация-{str(member).replace("#", "").replace(" ", "-")}' )
+        if regchen is not None:
+            await regchen.delete()
+        
+        regchen = await guild.create_text_channel(f'Регистрация-{member}', 
+                                                overwrites=overwrites, 
+                                                position=0,
+                                                topic='Зарегистрируйся, чтобы посещать лекции',
+                                                slowmode_delay=10,
+                                                category=categorie,
+                                                default_auto_archive_duration=1440)
 
-    await ctx.channel.send(f'{member.mention}, переходи в эту комнату: {regchen.mention}', delete_after=30)
-    await regchen.send('Напишите, пожалуйста, вашу группу')
+        await regchen.send(f'{member.mention}, напишите, пожалуйста, вашу группу')
 
 
 @bot.event

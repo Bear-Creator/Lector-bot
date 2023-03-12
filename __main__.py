@@ -49,6 +49,7 @@ async def on_ready():
             f'''CREATE TABLE if NOT EXISTS users_{guild.id} (
             id        int,
             sid       int,
+            temp_grp  int,
             FOREIGN KEY (sid) REFERENCES students (id)
             );'''
         )
@@ -56,8 +57,15 @@ async def on_ready():
         for member in guild.members:
             await new_user(member)
         db.commit()
-    
+        
+        global role_autho
+        role_autho = discord.utils.get(guild.roles, name = config.ROLE_AUTHORIZED_NAME)
+        permissions = discord.Permissions(**config.ROLE_AUTHORIZED_PERMISSIONS)
+        if role_autho is None:
+            role_autho = await guild.create_role(name=config.ROLE_AUTHORIZED_NAME, permissions=permissions)
+
     print(config.STARTUP_COMPLETE_MESSAGE)
+
 
 @bot.command() 
 async def reg(ctx: commands.Context):
@@ -74,22 +82,82 @@ async def reg(ctx: commands.Context):
     if categorie is None: 
         categorie = await guild.create_category('Регистрация')
 
-    regchen = discord.utils.get(categorie.channels, name=f'Регистрация-{member.name.lower()[:-5]}')
-    if regchen is None:
-        regchen = await guild.create_text_channel(f'Регистрация-{member}', 
-                                                overwrites=overwrites, 
-                                                position=0,
-                                                topic='Зарегистрируйся, чтобы посещать лекции',
-                                                slowmode_delay=30,
-                                                category=categorie,
-                                                default_auto_archive_duration=1440)
-        
-    await ctx.channel.send(f'{member.mention}, переходи в эту комнату: {regchen.mention}')
-    await regchen.send('Напишите, пожалуйста ваше полное имя в форме ФИО')
-
-
-
+    regchen = discord.utils.get(categorie.channels, name=f'регистрация-{member.name.lower()+str(member)[-4:]}')
+    if regchen is not None:
+        await regchen.delete()
     
+    regchen = await guild.create_text_channel(f'Регистрация-{member}', 
+                                            overwrites=overwrites, 
+                                            position=0,
+                                            topic='Зарегистрируйся, чтобы посещать лекции',
+                                            slowmode_delay=30,
+                                            category=categorie,
+                                            default_auto_archive_duration=1440)
+
+    await ctx.channel.send(f'{member.mention}, переходи в эту комнату: {regchen.mention}', delete_after=30)
+    await regchen.send('Напишите, пожалуйста, вашу группу')
+
+
+@bot.event
+async def on_message(msg: discord.Message):
+    author = msg.author
+    channel = msg.channel
+    text = msg.content
+    guild = msg.guild
+    if author.bot:
+        return
+
+    print(f'{author}: {text}')
+    
+    if 'регистрация' in channel.name:
+
+        groups = [i[0] for i in set(cursor.execute('SELECT grp FROM students;'))]
+        group = cursor.execute(f'SELECT temp_grp FROM users_{guild.id} WHERE id == {author.id};').fetchone()[0]
+
+        if group is None and text in map(str, groups):
+
+            cursor.execute( f'UPDATE users_{guild.id} SET temp_grp={int(text)} WHERE id = {author.id};' )
+            db.commit()
+
+            await msg.reply('Отлично, теперь введите ваше полное имя в форме ФИО')
+            return
+
+        elif group is None:
+
+            await msg.reply('Извените, Вашей группы ещё нет в базе. Обратитесь к администратору!')
+            return
+        
+        student = cursor.execute(f'SELECT * FROM students WHERE name = "{text}";').fetchone()
+        if student[1] != group:
+
+            cursor.execute(f'UPDATE users_{guild.id} DELETE temp_grp WHERE id = {author.id};')
+            db.commit()
+
+            await msg.reply('Данные введены неверно! Попробуде ещё раз')
+            channel.delete()
+
+            return
+        
+        cursor.execute(f'UPDATE users_{guild.id} SET sid = {student[0]} WHERE id = {author.id};')
+        db.commit()
+
+        name = text.split()
+        if len(' '.join(name[:2])) <= 32:
+            name = ' '.join(name[:2])
+        elif len(name[0]) <= 32:
+            name = name[0]
+        else:
+            name = name[:32]
+
+        await author.edit(nick=name)
+        await author.add_roles(role_autho)
+        await channel.send('Вы успешно авторизовалисть!')
+        await channel.delete()
+
+ 
+
+    await bot.process_commands(msg)
+
 
 keep_alive()
 bot.run(config.BOT_TOKEN)

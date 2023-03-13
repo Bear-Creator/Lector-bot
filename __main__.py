@@ -1,7 +1,8 @@
-from webserver import keep_alive
+from lib.webserver import keep_alive
 import discord
 from discord.ext import commands
 import sqlite3
+import time
 from config import config
 from lib.mytools import *
 
@@ -32,6 +33,10 @@ if __name__=="__main__":
 
     copy_table(config.DB_LINK_STUDLIST, config.DB_LINK_SERVER, 'students')
 
+@bot.command
+@commands.has_any_role('Лектор', 'Администратор')
+async def start(ctx):
+    return
 
 @bot.event
 async def on_ready():
@@ -54,7 +59,7 @@ async def on_ready():
             await new_user(member)
         db.commit()
         
-        global role_autho
+
         role_autho = discord.utils.get(guild.roles, name = config.ROLE_AUTHORIZED_NAME)
         permissions = discord.Permissions(**config.ROLE_AUTHORIZED_PERMISSIONS)
         if role_autho is None:
@@ -62,6 +67,9 @@ async def on_ready():
 
     print(config.STARTUP_COMPLETE_MESSAGE)
 
+@bot.event
+async def on_member_join(member):
+    await new_user(member)
 
 @bot.event
 async def on_raw_reaction_add(reaction: discord.raw_models.RawReactionActionEvent):
@@ -79,7 +87,7 @@ async def on_raw_reaction_add(reaction: discord.raw_models.RawReactionActionEven
         if categorie is None: 
             categorie = await guild.create_category('Регистрация')
 
-        regchen = discord.utils.get(categorie.channels, name=f'регистрация-{str(member).replace("#", "").replace(" ", "-")}' )
+        regchen = discord.utils.get(categorie.channels, name=f'регистрация-{str(member).replace("#", "").replace(" ", "-").lower()}' )
         if regchen is not None:
             await regchen.delete()
         
@@ -92,7 +100,6 @@ async def on_raw_reaction_add(reaction: discord.raw_models.RawReactionActionEven
                                                 default_auto_archive_duration=1440)
 
         await regchen.send(f'{member.mention}, напишите, пожалуйста, вашу группу')
-
 
 @bot.event
 async def on_message(msg: discord.Message):
@@ -109,6 +116,7 @@ async def on_message(msg: discord.Message):
 
         groups = [i[0] for i in set(cursor.execute('SELECT grp FROM students;'))]
         group = cursor.execute(f'SELECT temp_grp FROM users_{guild.id} WHERE id == {author.id};').fetchone()[0]
+        
 
         if group is None and text in map(str, groups):
 
@@ -121,19 +129,44 @@ async def on_message(msg: discord.Message):
         elif group is None:
 
             await msg.reply('Извените, Вашей группы ещё нет в базе. Обратитесь к администратору!')
+            time.sleep(20)
+            await channel.delete()
             return
         
+        
         student = cursor.execute(f'SELECT * FROM students WHERE name = "{text}";').fetchone()
-        if student[1] != group:
 
-            cursor.execute(f'UPDATE users_{guild.id} DELETE temp_grp WHERE id = {author.id};')
+        if student is None:
+
+            cursor.execute(f'UPDATE users_{guild.id} SET temp_grp=null WHERE id = {author.id};')
             db.commit()
 
             await msg.reply('Данные введены неверно! Попробуде ещё раз')
-            channel.delete()
+            await channel.delete()
 
             return
+
+        if student[1] != group:
+
+            await msg.reply('Данные введены неверно! Попробуде ещё раз')
+
+            cursor.execute(f'UPDATE users_{guild.id} SET temp_grp=null WHERE id = {author.id};')
+            db.commit()
+            time.sleep(20)
+            await channel.delete()
+            return
         
+        if cursor.execute(f'SELECT sid FROM users_{guild.id} WHERE sid = {student[0]};').fetchone() is not None:
+
+            await msg.reply('Кто-то уже вошёл под этим именем. Если это были не вы, обратитесь к администратору!')
+
+            cursor.execute(f'UPDATE users_{guild.id} SET temp_grp=null WHERE id = {author.id};')
+            db.commit()
+            time.sleep(20)
+            await channel.delete()
+            return
+
+
         cursor.execute(f'UPDATE users_{guild.id} SET sid = {student[0]} WHERE id = {author.id};')
         db.commit()
 
@@ -146,8 +179,9 @@ async def on_message(msg: discord.Message):
             name = name[:32]
 
         await author.edit(nick=name)
-        await author.add_roles(role_autho)
+        await author.add_roles(discord.utils.get(guild.roles, name = config.ROLE_AUTHORIZED_NAME))
         await channel.send('Вы успешно авторизовалисть!')
+        time.sleep(20)
         await channel.delete()
 
  

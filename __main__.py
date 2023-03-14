@@ -3,6 +3,7 @@ import discord
 from discord.ext import commands
 import sqlite3
 import time
+import os
 from config import config
 from lib.mytools import *
 
@@ -33,10 +34,32 @@ if __name__=="__main__":
 
     copy_table(config.DB_LINK_STUDLIST, config.DB_LINK_SERVER, 'students')
 
-@bot.command
+@bot.command(help = 'Считает количество участников в голосовом чате')
 @commands.has_any_role('Лектор', 'Администратор')
-async def start(ctx):
+async def count(ctx: commands.Context):
+    voice = discord.utils.get(ctx.guild.voice_channels, name="Лекция")
+    stud = voice.members
+    f =  open('cash/studlist.txt', 'w')
+    for std in stud:
+        cursor.execute(f'SELECT students.name, students.grp FROM users_{ctx.guild.id}, students WHERE users_{ctx.guild.id}.id = {std.id};')
+        print(std.nick, file=f)
+    f.close()
+    await ctx.send(file=discord.File(r'cash/studlist.txt'))
+    os.remove('cash/studlist.txt')
     return
+
+@bot.command(help = 'deletes users information')
+@commands.has_any_role('Администратор')
+async def delusr(ctx: commands.Context, arg: str):
+    member = discord.utils.get(ctx.guild.members, id=int(arg))
+    for role in member.roles[1:]:
+        print(role)
+        await member.remove_roles(role)
+    await member.edit(nick=None)
+    cursor.execute(f'DELETE FROM users_{member.guild.id} WHERE id = {int(arg)};')
+    await new_user(member)
+    await ctx.reply(f'Пользователь {member} удалён.')
+    await ctx.message.delete()
 
 @bot.event
 async def on_ready():
@@ -70,6 +93,10 @@ async def on_ready():
 @bot.event
 async def on_member_join(member):
     await new_user(member)
+
+@bot.event
+async def on_member_remove(member: discord.Member):
+    cursor.execute(f'DELETE FROM users_{member.guild.id} WHERE id = {member.id};')
 
 @bot.event
 async def on_raw_reaction_add(reaction: discord.raw_models.RawReactionActionEvent):
@@ -128,42 +155,36 @@ async def on_message(msg: discord.Message):
 
         elif group is None:
 
-            await msg.reply('Извените, Вашей группы ещё нет в базе. Обратитесь к администратору!')
-            time.sleep(20)
-            await channel.delete()
+            await msg.reply('Извините, Вашей группы ещё нет в базе. Обратитесь к администратору!')
+            # time.sleep(20)
+            # await channel.delete()
             return
         
         
-        student = cursor.execute(f'SELECT * FROM students WHERE name = "{text}";').fetchone()
-
+        student = cursor.execute(f'SELECT * FROM students WHERE name = "{text.lower()}";').fetchone()
         if student is None:
-
+            await msg.reply('Данные введены неверно! Попробуде ещё раз')
+            # time.sleep(10)
             cursor.execute(f'UPDATE users_{guild.id} SET temp_grp=null WHERE id = {author.id};')
             db.commit()
-
-            await msg.reply('Данные введены неверно! Попробуде ещё раз')
-            await channel.delete()
-
+            # await channel.delete()
             return
 
         if student[1] != group:
-
             await msg.reply('Данные введены неверно! Попробуде ещё раз')
-
+            # time.sleep(10)
             cursor.execute(f'UPDATE users_{guild.id} SET temp_grp=null WHERE id = {author.id};')
             db.commit()
-            time.sleep(20)
-            await channel.delete()
+            # await channel.delete()
             return
         
         if cursor.execute(f'SELECT sid FROM users_{guild.id} WHERE sid = {student[0]};').fetchone() is not None:
-
+            
             await msg.reply('Кто-то уже вошёл под этим именем. Если это были не вы, обратитесь к администратору!')
-
+            # time.sleep(20)
             cursor.execute(f'UPDATE users_{guild.id} SET temp_grp=null WHERE id = {author.id};')
             db.commit()
-            time.sleep(20)
-            await channel.delete()
+            # await channel.delete()
             return
 
 
@@ -181,7 +202,7 @@ async def on_message(msg: discord.Message):
         await author.edit(nick=name)
         await author.add_roles(discord.utils.get(guild.roles, name = config.ROLE_AUTHORIZED_NAME))
         await channel.send('Вы успешно авторизовалисть!')
-        time.sleep(20)
+        time.sleep(10)
         await channel.delete()
 
  

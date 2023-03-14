@@ -61,6 +61,16 @@ async def delusr(ctx: commands.Context, arg: str):
     await ctx.reply(f'Пользователь {member} удалён.')
     await ctx.message.delete()
 
+@bot.command()
+async def test(ctx: commands.Context):
+
+    roles = ctx.author.roles
+
+    otvet = f'{roles}'
+    await ctx.reply(otvet)
+    await ctx.message.delete()
+    pass
+
 @bot.event
 async def on_ready():
     print(config.STARTUP_MESSAGE)
@@ -140,10 +150,12 @@ async def on_message(msg: discord.Message):
     print(f'{author}: {text}')
     
     if 'регистрация' in channel.name:
+        if discord.utils.get(author.roles, name='Администратор') is not None:
+            return
 
         groups = [i[0] for i in set(cursor.execute('SELECT grp FROM students;'))]
         group = cursor.execute(f'SELECT temp_grp FROM users_{guild.id} WHERE id == {author.id};').fetchone()[0]
-        
+
 
         if group is None and text in map(str, groups):
 
@@ -155,7 +167,7 @@ async def on_message(msg: discord.Message):
 
         elif group is None:
 
-            await msg.reply('Извините, Вашей группы ещё нет в базе. Обратитесь к администратору!')
+            await msg.reply('Извините, введите группу ещё раз, либо обратитесь к администратору при повторной ошибке.')
             # time.sleep(20)
             # await channel.delete()
             return
@@ -163,7 +175,7 @@ async def on_message(msg: discord.Message):
         
         student = cursor.execute(f'SELECT * FROM students WHERE name = "{text.lower()}";').fetchone()
         if student is None:
-            await msg.reply('Данные введены неверно! Попробуде ещё раз')
+            await msg.reply('ФИО введено неверно. Проверьте данные и попробуйте ещё раз, при повторной ошибке обратитесь к администратору.')
             # time.sleep(10)
             cursor.execute(f'UPDATE users_{guild.id} SET temp_grp=null WHERE id = {author.id};')
             db.commit()
@@ -171,7 +183,7 @@ async def on_message(msg: discord.Message):
             return
 
         if student[1] != group:
-            await msg.reply('Данные введены неверно! Попробуде ещё раз')
+            await msg.reply('ФИО введено неверно. Проверьте данные и попробуйте ещё раз, при повторной ошибке обратитесь к администратору.')
             # time.sleep(10)
             cursor.execute(f'UPDATE users_{guild.id} SET temp_grp=null WHERE id = {author.id};')
             db.commit()

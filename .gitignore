@@ -133,3 +133,4 @@ config
 webserver.py
 db/
 cash/
+test*

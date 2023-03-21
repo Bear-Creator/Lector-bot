@@ -1,11 +1,11 @@
-from lib.webserver import keep_alive
+from mylib.webserver import keep_alive
 import discord
 from discord.ext import commands
 import sqlite3
 import time
 import os
 from config import config
-from lib.mytools import *
+from mylib.mytools import *
 
 
 db = sqlite3.connect(config.DB_LINK_SERVER)
